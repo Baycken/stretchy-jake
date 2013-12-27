@@ -1,27 +1,32 @@
 #include <pebble.h>
 
+#define ANIMATION_DURATION 600
+
 static Window *window;
 static BitmapLayer *background_layer;
 static GBitmap *background_image;
 
-static Layer *time_layer;
-static BitmapLayer *time_num_layer[5];
-static GBitmap *time_num_img[5];
 static BitmapLayer *battery_low_layer;
 static GBitmap *battery_low_img;
 
+static Layer *time_layer;
+static BitmapLayer *time_num_layer[5];
+static GBitmap *time_num_img[5];
 
 static Layer *date_layer;
 static BitmapLayer *date_num_layer[7];
 static GBitmap *date_num_img[7];
+
 int time_cache[4]={-1,-1,-1,-1}; //hour 10s, hour 1s,minit 10s,minut 1s
 int date_cache[7]={-1,-1,-1,-1,-1,-1,-1};//wday, month 10s, month 1s, date 10s, date 1s, year 10s, year 1s
 int time_now[4];
 int date_now[7];
+
 static GRect time_from_rect;
 static GRect time_to_rect;
 static GRect date_from_rect;
 static GRect date_to_rect;
+
 static PropertyAnimation *time_animation_beg;
 static PropertyAnimation *time_animation_end;
 static PropertyAnimation *date_animation_beg;
@@ -86,8 +91,10 @@ void time_animation_stopped(Animation *animation, void *data) {
     (void)data;
     
     property_animation_destroy(time_animation_end);
-    
     time_animation_end= property_animation_create_layer_frame(time_layer,&time_from_rect,&time_to_rect);
+    animation_set_curve(    &time_animation_end->animation, AnimationCurveLinear);
+    animation_set_duration( &time_animation_end->animation, ANIMATION_DURATION);
+    
     //set time image
     for(int i =0; i<4;i++){
         if(time_now[i]!=time_cache[i]){
@@ -104,18 +111,19 @@ void time_animation_stopped(Animation *animation, void *data) {
         bitmap_layer_set_bitmap(time_num_layer[4],time_num_img[4]);
     }
     
-    layer_set_hidden(bitmap_layer_get_layer(battery_low_layer),battery_state_service_peek().charge_percent > 25);
+    layer_set_hidden(bitmap_layer_get_layer(battery_low_layer),battery_state_service_peek().charge_percent > 25); //charge indication
     layer_mark_dirty(time_layer);
     animation_schedule((Animation*) time_animation_end);
-    
 }
+
 void date_animation_stopped(Animation *animation, void *data) {
     (void)animation;
     (void)data;
-
     
     property_animation_destroy(date_animation_end);
     date_animation_end= property_animation_create_layer_frame(date_layer,&date_from_rect,&date_to_rect);
+    animation_set_curve(    &date_animation_end->animation, AnimationCurveLinear);
+    animation_set_duration( &date_animation_end->animation, ANIMATION_DURATION);
 
     //set week day
     if (date_now[0]!= date_cache[0]) {
@@ -143,6 +151,9 @@ void date_animation_stopped(Animation *animation, void *data) {
 
 void handle_minuit_tick(struct tm *tick_time, TimeUnits units_changed){
     char temp = tick_time->tm_hour;
+    if(!clock_is_24h_style()){
+        temp=temp%12;
+    }
     time_now[0] = temp/10;
     time_now[1] = temp%10;
     temp = tick_time->tm_min;
@@ -161,16 +172,19 @@ void handle_minuit_tick(struct tm *tick_time, TimeUnits units_changed){
     
     property_animation_destroy(time_animation_beg);
     time_animation_beg= property_animation_create_layer_frame(time_layer,&time_to_rect,&time_from_rect);
+    animation_set_curve(&time_animation_beg->animation, AnimationCurveLinear);
+    animation_set_duration( &time_animation_beg->animation, ANIMATION_DURATION);
     animation_set_handlers((Animation*) time_animation_beg, (AnimationHandlers) {
         .started = NULL,
         .stopped = (AnimationStoppedHandler) time_animation_stopped
     }, 0);
-    
     animation_schedule((Animation*) time_animation_beg);
+    
     if(date_now[3]!=date_cache[3]){
-        
         property_animation_destroy(date_animation_beg);
         date_animation_beg= property_animation_create_layer_frame(date_layer,&date_to_rect,&date_from_rect);
+        animation_set_curve(&date_animation_beg->animation, AnimationCurveLinear);
+        animation_set_duration( &date_animation_beg->animation, ANIMATION_DURATION);
         animation_set_handlers((Animation*) date_animation_beg, (AnimationHandlers) {
             .started = NULL,
             .stopped = (AnimationStoppedHandler) date_animation_stopped
@@ -187,57 +201,34 @@ static void window_load(Window *window) {
     time_to_rect = GRect(8,76,136,34);
     date_from_rect = GRect(13,140,131,0);
     date_to_rect = GRect(13,127,131,15);
-    
-    
-    
 //init background layer
     background_layer = bitmap_layer_create(GRect(0,1,144,166));
     background_image = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_BACKGROUND);
     bitmap_layer_set_bitmap(background_layer,background_image);
     bitmap_layer_set_alignment(background_layer, GAlignCenter);
     layer_add_child(window_layer, bitmap_layer_get_layer(background_layer));
-    
 //init time layer
     time_layer = layer_create(time_from_rect);
     layer_set_clips(time_layer,1);
     layer_add_child(window_layer,time_layer);
     for(int i = 0; i<5 ;i++){
-        time_num_layer[i] = bitmap_layer_create(GRect(
-                                                      time_num_position[i][0],
-                                                      time_num_position[i][1],
-                                                      time_num_position[i][2],
-                                                      time_num_position[i][3]
-                                                      )
-                                                );
+        time_num_layer[i] = bitmap_layer_create(GRect(time_num_position[i][0],time_num_position[i][1],time_num_position[i][2],time_num_position[i][3]));
         layer_add_child(time_layer,bitmap_layer_get_layer(time_num_layer[i]));
-        //bitmap_layer_set_background_color(time_num_layer[i],GColorBlack);
     }
-    
-    
 //init date layer
     date_layer = layer_create(date_to_rect);
     layer_set_clips(date_layer,1);
     layer_add_child(window_layer,date_layer);
     for(int i = 0; i<7 ;i++){
-        date_num_layer[i] = bitmap_layer_create(GRect(
-                                                      date_num_position[i][0],
-                                                      date_num_position[i][1],
-                                                      date_num_position[i][2],
-                                                      date_num_position[i][3]
-                                                      )
-                                                );
+        date_num_layer[i] = bitmap_layer_create(GRect(date_num_position[i][0],date_num_position[i][1],date_num_position[i][2],date_num_position[i][3]));
         layer_add_child(date_layer,bitmap_layer_get_layer(date_num_layer[i]));
-        //bitmap_layer_set_background_color(date_num_layer[i],GColorBlack);
     }
-    
-    
 //init battery low layer
     battery_low_layer = bitmap_layer_create(GRect(66,2,12,31));
     battery_low_img = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_BAT_LOW);
     bitmap_layer_set_bitmap(battery_low_layer,battery_low_img);
     layer_set_hidden(bitmap_layer_get_layer(battery_low_layer),1);
     layer_add_child(window_layer,bitmap_layer_get_layer(battery_low_layer));
-    
 //init time tick callback
     tick_timer_service_subscribe(MINUTE_UNIT,handle_minuit_tick);
     
@@ -245,22 +236,28 @@ static void window_load(Window *window) {
 
 static void window_unload(Window *window) {
     tick_timer_service_unsubscribe();
+    
     property_animation_destroy(time_animation_beg);
     property_animation_destroy(time_animation_end);
     property_animation_destroy(date_animation_beg);
     property_animation_destroy(date_animation_end);
+    
     for(int i = 0; i<5 ;i++){
         gbitmap_destroy(time_num_img[i]);
         bitmap_layer_destroy(time_num_layer[i]);
     }
+    
     for(int i = 0; i<7 ;i++){
         gbitmap_destroy(time_num_img[i]);
         bitmap_layer_destroy(date_num_layer[i]);
     }
+    
     gbitmap_destroy(battery_low_img);
     bitmap_layer_destroy(battery_low_layer);
+    
     layer_destroy(time_layer);
     layer_destroy(date_layer);
+    
     gbitmap_destroy(background_image);
     bitmap_layer_destroy(background_layer);
 }
