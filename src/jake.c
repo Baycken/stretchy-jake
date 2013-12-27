@@ -15,7 +15,9 @@ static Layer *date_layer;
 static BitmapLayer *date_num_layer[7];
 static GBitmap *date_num_img[7];
 int time_cache[4]={-1,-1,-1,-1}; //hour 10s, hour 1s,minit 10s,minut 1s
-int date_cache[7]={-1,-1,-1,-1,-1,-1,-1}; //wday, month 10s, month 1s, date 10s, date 1s, year 10s, year 1s
+int date_cache[7]={-1,-1,-1,-1,-1,-1,-1};//wday, month 10s, month 1s, date 10s, date 1s, year 10s, year 1s
+int time_now[4];
+int date_now[7];
 const char time_num_position[5][4] = {
     {  0,0,26,34}, //hour 10s
     { 29,0,26,34}, //hour 1s
@@ -76,8 +78,6 @@ const int week_num_id[7] = {
 
 
 void handle_minuit_tick(struct tm *tick_time, TimeUnits units_changed){
-    int time_now[4];
-    int date_now[7];
     int temp = tick_time->tm_hour;
     time_now[0] = temp/10;
     time_now[1] = temp%10;
@@ -95,22 +95,22 @@ void handle_minuit_tick(struct tm *tick_time, TimeUnits units_changed){
     date_now[5] = temp/10;
     date_now[6] = temp%10;
     
-        layer_set_hidden(bitmap_layer_get_layer(battery_low_layer),battery_state_service_peek().charge_percent > 25);
+    
     //set time image
     for(int i =0; i<4;i++){
         if(time_now[i]!=time_cache[i]){
             time_cache[i]=time_now[i];
             gbitmap_destroy(time_num_img[i]);
-            time_num_img[i]= gbitmap_create_with_resource(time_num_id[time_cache[i]]);
+            time_num_img[i]= gbitmap_create_with_resource(time_num_id[time_now[i]]);
             bitmap_layer_set_bitmap(time_num_layer[i],time_num_img[i]);
         
         }
     }
-    //set column
+    //set week day
     if (date_now[0]!= date_cache[0]) {
         date_cache[0] = date_now[0];
         gbitmap_destroy(date_num_img[0]);
-        date_num_img[0]= gbitmap_create_with_resource(week_num_id[date_cache[0]]);
+        date_num_img[0]= gbitmap_create_with_resource(week_num_id[date_now[0]]);
         bitmap_layer_set_bitmap(date_num_layer[0],date_num_img[0]);
     }
         
@@ -119,18 +119,21 @@ void handle_minuit_tick(struct tm *tick_time, TimeUnits units_changed){
         if(date_now[i]!=date_cache[i]){
             date_cache[i]=date_now[i];
             gbitmap_destroy(date_num_img[i]);
-            date_num_img[i]= gbitmap_create_with_resource(date_num_id[date_cache[i]]);
+            date_num_img[i]= gbitmap_create_with_resource(date_num_id[date_now[i]]);
             bitmap_layer_set_bitmap(date_num_layer[i],date_num_img[i]);
                 
         }
 
     }
     
-    //set week day image
+    //set column
     if(time_num_img[4] == NULL){
         time_num_img[4]= gbitmap_create_with_resource(RESOURCE_ID_IMAGE_COLUMN);
         bitmap_layer_set_bitmap(time_num_layer[4],time_num_img[4]);
     }
+    layer_set_hidden(bitmap_layer_get_layer(battery_low_layer),battery_state_service_peek().charge_percent > 25);
+    layer_mark_dirty(time_layer);
+    layer_mark_dirty(date_layer);
 }
 
 
