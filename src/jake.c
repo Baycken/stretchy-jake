@@ -1,6 +1,7 @@
 #include <pebble.h>
 
 #define ANIMATION_DURATION 600
+#define AMERICAN_FORMAT 1
 
 static Window *window;
 static BitmapLayer *background_layer;
@@ -17,10 +18,10 @@ static Layer *date_layer;
 static BitmapLayer *date_num_layer[7];
 static GBitmap *date_num_img[7];
 
-int time_cache[4]={-1,-1,-1,-1}; //hour 10s, hour 1s,minit 10s,minut 1s
-int date_cache[7]={-1,-1,-1,-1,-1,-1,-1};//wday, month 10s, month 1s, date 10s, date 1s, year 10s, year 1s
-int time_now[4];
-int date_now[7];
+static int time_cache[4]={-1,-1,-1,-1}; //hour 10s, hour 1s,minit 10s,minut 1s
+static int date_cache[7]={-1,-1,-1,-1,-1,-1,-1};//wday, month 10s, month 1s, date 10s, date 1s, year 10s, year 1s
+static int time_now[4];
+static int date_now[7];
 
 static GRect time_from_rect;
 static GRect time_to_rect;
@@ -32,15 +33,15 @@ static PropertyAnimation *time_animation_end;
 static PropertyAnimation *date_animation_beg;
 static PropertyAnimation *date_animation_end;
 
-const char time_num_position[5][4] = {
+static const char time_num_position[5][4] = {
     {  0,0,26,34}, //hour 10s
     { 29,0,26,34}, //hour 1s
     { 73,0,26,34}, //minuit 10s
     {102,0,26,34},  //minuit 1s
     { 58,3,12,31} // :
 };
-
-const char date_num_position[7][4] ={
+#if (AMERICAN_FORMAT)
+static const char date_num_position[7][4] ={
     {  0,0,25,15}, //day
     { 32,0,12,15}, //month 10s
     { 45,0,12,15}, //month 1s
@@ -49,6 +50,17 @@ const char date_num_position[7][4] ={
     { 93,0,12,15}, //year 10s
     {106,0,12,15}, //year 1s
 };
+#else
+static const char date_num_position[7][4] ={
+    {  0,0,25,15}, //day
+    { 63,0,12,15}, //date 10s
+    { 76,0,12,15}, //date 1s
+    { 32,0,12,15}, //month 10s
+    { 45,0,12,15}, //month 1s
+    { 93,0,12,15}, //year 10s
+    {106,0,12,15}, //year 1s
+};
+#endif
 
 const int time_num_id[10]={
     RESOURCE_ID_IMAGE_NUM_L_0,
@@ -112,6 +124,7 @@ void time_animation_stopped(Animation *animation, void *data) {
     }
     
     layer_set_hidden(bitmap_layer_get_layer(battery_low_layer),battery_state_service_peek().charge_percent > 25); //charge indication
+    APP_LOG(APP_LOG_LEVEL_DEBUG,"Battery Level: %d",battery_state_service_peek().charge_percent);
     layer_mark_dirty(time_layer);
     animation_schedule((Animation*) time_animation_end);
 }
@@ -224,7 +237,7 @@ static void window_load(Window *window) {
         layer_add_child(date_layer,bitmap_layer_get_layer(date_num_layer[i]));
     }
 //init battery low layer
-    battery_low_layer = bitmap_layer_create(GRect(66,2,12,31));
+    battery_low_layer = bitmap_layer_create(GRect(66,3,12,31));
     battery_low_img = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_BAT_LOW);
     bitmap_layer_set_bitmap(battery_low_layer,battery_low_img);
     layer_set_hidden(bitmap_layer_get_layer(battery_low_layer),1);
@@ -236,19 +249,18 @@ static void window_load(Window *window) {
 
 static void window_unload(Window *window) {
     tick_timer_service_unsubscribe();
-    
     property_animation_destroy(time_animation_beg);
     property_animation_destroy(time_animation_end);
     property_animation_destroy(date_animation_beg);
     property_animation_destroy(date_animation_end);
-    
+
     for(int i = 0; i<5 ;i++){
         gbitmap_destroy(time_num_img[i]);
         bitmap_layer_destroy(time_num_layer[i]);
     }
     
     for(int i = 0; i<7 ;i++){
-        gbitmap_destroy(time_num_img[i]);
+        gbitmap_destroy(date_num_img[i]);
         bitmap_layer_destroy(date_num_layer[i]);
     }
     
