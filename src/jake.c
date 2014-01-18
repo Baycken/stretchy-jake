@@ -1,6 +1,6 @@
 #include <pebble.h>
 
-#define ANIMATION_DURATION 600
+#define ANIMATION_DURATION 400
 #define AMERICAN_FORMAT 1
 
 static Window *window;
@@ -124,7 +124,7 @@ void time_animation_stopped(Animation *animation, void *data) {
     }
     
     layer_set_hidden(bitmap_layer_get_layer(battery_low_layer),battery_state_service_peek().charge_percent > 25); //charge indication
-    APP_LOG(APP_LOG_LEVEL_DEBUG,"Battery Level: %d",battery_state_service_peek().charge_percent);
+    //APP_LOG(APP_LOG_LEVEL_DEBUG,"Battery Level: %d",battery_state_service_peek().charge_percent);
     layer_mark_dirty(time_layer);
     animation_schedule((Animation*) time_animation_end);
 }
@@ -193,7 +193,7 @@ void handle_minuit_tick(struct tm *tick_time, TimeUnits units_changed){
     }, 0);
     animation_schedule((Animation*) time_animation_beg);
     
-    if(date_now[3]!=date_cache[3]){
+    if(date_now[4]!=date_cache[4]){
         property_animation_destroy(date_animation_beg);
         date_animation_beg= property_animation_create_layer_frame(date_layer,&date_to_rect,&date_from_rect);
         animation_set_curve(&date_animation_beg->animation, AnimationCurveLinear);
